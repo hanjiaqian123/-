@@ -1,6 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native';
 
-import type { CurrentWeather } from '../../App';
+import type { CurrentWeather } from '../../types/models';
 
 type WeatherCardProps = {
   weather: CurrentWeather | null;

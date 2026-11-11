@@ -1,6 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import type { OutfitRecommendation } from '../../App';
+import type { OutfitRecommendation } from '../../types/models';
 
 type OutfitCardProps = {
   recommendation: OutfitRecommendation | null;
