@@ -9,12 +9,14 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import CosmicBackground from '../components/cosmic/CosmicBackground';
 import OutfitCard from '../components/outfit/OutfitCard';
 import CitySearch from '../components/weather/CitySearch';
 import HourlyWeatherForecast from '../components/weather/HourlyWeather';
 import WeatherCard from '../components/weather/WeatherCard';
 import type { ScreenProps } from '../navigation/types';
 import { fetchWeather } from '../services/weatherApi';
+import { cosmicTheme } from '../theme/cosmicTheme';
 import type {
   CitySearchResult,
   CurrentWeather,
@@ -348,6 +350,7 @@ export default function HomeScreen({ navigation }: ScreenProps<'Home'>) {
 
   return (
     <SafeAreaView style={styles.safeArea}>
+      <CosmicBackground>
       <ScrollView
         contentContainerStyle={styles.pageContent}
         showsVerticalScrollIndicator={false}
@@ -430,10 +433,12 @@ export default function HomeScreen({ navigation }: ScreenProps<'Home'>) {
           </View>
         ) : null}
 
-        <HourlyWeatherForecast
-          data={hourlyWeather}
-          isLoading={isLoading}
-        />
+        <View style={styles.forecastSurface}>
+          <HourlyWeatherForecast
+            data={hourlyWeather}
+            isLoading={isLoading}
+          />
+        </View>
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>今日穿搭推荐</Text>
@@ -505,6 +510,7 @@ export default function HomeScreen({ navigation }: ScreenProps<'Home'>) {
         onSelectCity={selectCity}
         visible={isCitySearchVisible}
       />
+      </CosmicBackground>
     </SafeAreaView>
   );
 }
@@ -515,7 +521,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   page: {
-    backgroundColor: '#F3F6FA',
+    backgroundColor: 'transparent',
     flex: 1,
   },
   pageContent: {
@@ -529,12 +535,12 @@ const styles = StyleSheet.create({
     marginTop: 18,
   },
   logo: {
-    color: '#18324B',
+    color: cosmicTheme.colors.textPrimary,
     fontSize: 27,
     fontWeight: '800',
   },
   subtitle: {
-    color: '#8293A5',
+    color: cosmicTheme.colors.softStarlight,
     fontSize: 10,
     letterSpacing: 2,
     marginTop: 4,
@@ -585,7 +591,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   lastUpdated: {
-    color: '#8293A5',
+    color: cosmicTheme.colors.textSecondary,
     fontSize: 9,
     marginTop: 5,
   },
@@ -596,13 +602,13 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   sectionTitle: {
-    color: '#18324B',
+    color: cosmicTheme.colors.textPrimary,
     fontSize: 21,
     fontWeight: '700',
     marginBottom: 7,
   },
   sectionSubtitle: {
-    color: '#8293A5',
+    color: cosmicTheme.colors.textSecondary,
     fontSize: 13,
   },
   errorCard: {
@@ -666,10 +672,16 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   footer: {
-    color: '#A0ADBA',
+    color: cosmicTheme.colors.textSecondary,
     fontSize: 11,
     marginBottom: 35,
     marginTop: 30,
     textAlign: 'center',
+  },
+  forecastSurface: {
+    backgroundColor: cosmicTheme.colors.surface,
+    borderRadius: 22,
+    paddingHorizontal: 14,
+    paddingTop: 16,
   },
 });
