@@ -17,7 +17,7 @@ export default function OutfitResultScreen({
 }: ScreenProps<'OutfitResult'>) {
   const { items } = useWardrobe();
   const [variant, setVariant] = useState(0);
-  const { recommendation, weather } = route.params;
+  const { cityName, recommendation, weather } = route.params;
 
   const selectedItems = items
     .map((_, index) => items[(index + variant) % items.length])
@@ -37,7 +37,7 @@ export default function OutfitResultScreen({
     >
       <View style={styles.weatherBanner}>
         <View>
-          <Text style={styles.weatherLabel}>长沙 · 当前天气</Text>
+          <Text style={styles.weatherLabel}>{cityName} · 当前天气</Text>
           <Text style={styles.weatherValue}>
             {weather ? `${Math.round(weather.temperature_2m)}°` : '--°'}
           </Text>

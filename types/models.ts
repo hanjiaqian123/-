@@ -9,6 +9,29 @@ export type CurrentWeather = {
   uv_index: number;
 };
 
+export type HourlyWeather = {
+  time: string;
+  temperature_2m: number;
+  relative_humidity_2m: number;
+  precipitation_probability: number;
+  precipitation: number;
+  weather_code: number;
+  is_day: number;
+};
+
+export type WeatherLocation = {
+  name: string;
+  latitude: number;
+  longitude: number;
+  country: string;
+  admin1?: string;
+  timezone?: string;
+};
+
+export type CitySearchResult = WeatherLocation & {
+  id: number;
+};
+
 export type OutfitRecommendation = {
   id: string;
   title: string;

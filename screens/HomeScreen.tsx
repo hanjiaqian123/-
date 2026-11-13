@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -9,9 +10,18 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import OutfitCard from '../components/outfit/OutfitCard';
+import CitySearch from '../components/weather/CitySearch';
+import HourlyWeatherForecast from '../components/weather/HourlyWeather';
 import WeatherCard from '../components/weather/WeatherCard';
 import type { ScreenProps } from '../navigation/types';
-import type { CurrentWeather, OutfitRecommendation } from '../types/models';
+import { fetchWeather } from '../services/weatherApi';
+import type {
+  CitySearchResult,
+  CurrentWeather,
+  HourlyWeather,
+  OutfitRecommendation,
+  WeatherLocation,
+} from '../types/models';
 
 function getBaseOutfitRecommendations(
   weather: CurrentWeather
@@ -228,33 +238,37 @@ function getOutfitRecommendations(
   });
 }
 
-const WEATHER_URL =
-  'https://api.open-meteo.com/v1/forecast?latitude=28.2282&longitude=112.9388&current=temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation,weather_code,wind_speed_10m,uv_index&timezone=Asia%2FShanghai';
+const DEFAULT_CITY: WeatherLocation = {
+  name: '长沙',
+  latitude: 28.2282,
+  longitude: 112.9388,
+  country: '中国',
+  admin1: '湖南省',
+  timezone: 'Asia/Shanghai',
+};
 
-function isCurrentWeather(value: unknown): value is CurrentWeather {
-  if (!value || typeof value !== 'object') {
-    return false;
+function formatLastUpdated(date: Date | null): string {
+  if (!date) {
+    return '等待首次更新';
   }
 
-  const weather = value as Record<string, unknown>;
-  return [
-    'temperature_2m',
-    'relative_humidity_2m',
-    'apparent_temperature',
-    'precipitation',
-    'weather_code',
-    'wind_speed_10m',
-    'is_day',
-    'uv_index',
-  ].every((key) => typeof weather[key] === 'number');
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  return `更新于 ${hours}:${minutes}`;
 }
 
 export default function HomeScreen({ navigation }: ScreenProps<'Home'>) {
   const [weather, setWeather] = useState<CurrentWeather | null>(null);
+  const [hourlyWeather, setHourlyWeather] = useState<HourlyWeather[]>([]);
+  const [selectedCity, setSelectedCity] =
+    useState<WeatherLocation>(DEFAULT_CITY);
+  const [isCitySearchVisible, setIsCitySearchVisible] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [weatherError, setWeatherError] = useState<string | null>(null);
   const [primaryRecommendationIndex, setPrimaryRecommendationIndex] =
     useState(0);
+  const weatherRequestInFlight = useRef(false);
 
   const recommendations = weather ? getOutfitRecommendations(weather) : [];
   const orderedRecommendations = recommendations.map(
@@ -264,42 +278,50 @@ export default function HomeScreen({ navigation }: ScreenProps<'Home'>) {
       ]
   );
 
-  const getWeather = useCallback(async () => {
-    setIsLoading(true);
-    setWeatherError(null);
-
-    try {
-      const response = await fetch(WEATHER_URL);
-      if (!response.ok) {
-        throw new Error(`天气服务响应异常（${response.status}）`);
+  const getWeather = useCallback(
+    async (
+      targetCity: WeatherLocation,
+      updateSelectedCity = false
+    ): Promise<boolean> => {
+      if (weatherRequestInFlight.current) {
+        return false;
       }
 
-      const data: unknown = await response.json();
-      const current =
-        data && typeof data === 'object'
-          ? (data as { current?: unknown }).current
-          : undefined;
+      weatherRequestInFlight.current = true;
+      setIsLoading(true);
+      setWeatherError(null);
 
-      if (!isCurrentWeather(current)) {
-        throw new Error('天气数据格式不完整');
+      try {
+        const forecast = await fetchWeather({
+          latitude: targetCity.latitude,
+          longitude: targetCity.longitude,
+        });
+
+        setWeather(forecast.current);
+        setHourlyWeather(forecast.hourly);
+        if (updateSelectedCity) {
+          setSelectedCity(targetCity);
+        }
+        setLastUpdated(new Date());
+        setPrimaryRecommendationIndex(0);
+        return true;
+      } catch (error) {
+        console.error('天气获取失败：', error);
+        setWeatherError(
+          error instanceof Error ? error.message : '天气获取失败，请稍后重试'
+        );
+        return false;
+      } finally {
+        weatherRequestInFlight.current = false;
+        setIsLoading(false);
       }
-
-      setWeather(current);
-      setPrimaryRecommendationIndex(0);
-    } catch (error) {
-      console.error('天气获取失败：', error);
-      setWeather(null);
-      setWeatherError(
-        error instanceof Error ? error.message : '天气获取失败，请稍后重试'
-      );
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+    },
+    []
+  );
 
   useEffect(() => {
     const requestTimer = setTimeout(() => {
-      void getWeather();
+      void getWeather(DEFAULT_CITY);
     }, 0);
 
     return () => clearTimeout(requestTimer);
@@ -311,6 +333,15 @@ export default function HomeScreen({ navigation }: ScreenProps<'Home'>) {
         (currentIndex) => (currentIndex + 1) % recommendations.length
       );
     }
+  }
+
+  function selectCity(city: CitySearchResult) {
+    if (weatherRequestInFlight.current) {
+      return;
+    }
+
+    setIsCitySearchVisible(false);
+    void getWeather(city, true);
   }
 
   const primaryRecommendation = orderedRecommendations[0] ?? null;
@@ -330,17 +361,65 @@ export default function HomeScreen({ navigation }: ScreenProps<'Home'>) {
           <Text style={styles.avatar}>👤</Text>
         </View>
 
-        <WeatherCard weather={weather} isLoading={isLoading} />
+        <View style={styles.weatherToolbar}>
+          <Pressable
+            accessibilityLabel={`切换城市，当前城市${selectedCity.name}`}
+            accessibilityRole="button"
+            disabled={isLoading}
+            onPress={() => setIsCitySearchVisible(true)}
+            style={({ pressed }) => [
+              styles.cityButton,
+              isLoading && styles.toolbarButtonDisabled,
+              pressed && styles.buttonPressed,
+            ]}
+          >
+            <Text style={styles.cityButtonText}>📍 {selectedCity.name}⌄</Text>
+            <Text numberOfLines={1} style={styles.cityMeta}>
+              {[selectedCity.admin1, selectedCity.country]
+                .filter(Boolean)
+                .join(' · ')}
+            </Text>
+          </Pressable>
+
+          <View style={styles.refreshArea}>
+            <Pressable
+              accessibilityLabel={`刷新${selectedCity.name}天气`}
+              accessibilityRole="button"
+              disabled={isLoading}
+              onPress={() => void getWeather(selectedCity)}
+              style={({ pressed }) => [
+                styles.refreshButton,
+                isLoading && styles.toolbarButtonDisabled,
+                pressed && styles.buttonPressed,
+              ]}
+            >
+              {isLoading ? (
+                <ActivityIndicator color="#FFFFFF" size="small" />
+              ) : (
+                <Text style={styles.refreshButtonText}>↻ 刷新</Text>
+              )}
+            </Pressable>
+            <Text style={styles.lastUpdated}>
+              {formatLastUpdated(lastUpdated)}
+            </Text>
+          </View>
+        </View>
+
+        <WeatherCard
+          cityName={selectedCity.name}
+          weather={weather}
+          isLoading={isLoading}
+        />
 
         {weatherError ? (
           <View style={styles.errorCard}>
-            <Text style={styles.errorTitle}>天气加载失败</Text>
+            <Text style={styles.errorTitle}>天气更新失败</Text>
             <Text style={styles.errorMessage}>{weatherError}</Text>
             <Pressable
               accessibilityLabel="重新加载天气"
               accessibilityRole="button"
               disabled={isLoading}
-              onPress={getWeather}
+              onPress={() => void getWeather(selectedCity)}
               style={({ pressed }) => [
                 styles.retryButton,
                 pressed && styles.buttonPressed,
@@ -350,6 +429,11 @@ export default function HomeScreen({ navigation }: ScreenProps<'Home'>) {
             </Pressable>
           </View>
         ) : null}
+
+        <HourlyWeatherForecast
+          data={hourlyWeather}
+          isLoading={isLoading}
+        />
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>今日穿搭推荐</Text>
@@ -397,6 +481,7 @@ export default function HomeScreen({ navigation }: ScreenProps<'Home'>) {
             accessibilityRole="button"
             onPress={() =>
               navigation.navigate('OutfitResult', {
+                cityName: selectedCity.name,
                 weather,
                 recommendation: primaryRecommendation,
               })
@@ -414,6 +499,12 @@ export default function HomeScreen({ navigation }: ScreenProps<'Home'>) {
 
         <Text style={styles.footer}>WeatherFit · 让每天穿搭更简单</Text>
       </ScrollView>
+
+      <CitySearch
+        onClose={() => setIsCitySearchVisible(false)}
+        onSelectCity={selectCity}
+        visible={isCitySearchVisible}
+      />
     </SafeAreaView>
   );
 }
@@ -450,6 +541,56 @@ const styles = StyleSheet.create({
   },
   avatar: {
     fontSize: 28,
+  },
+  weatherToolbar: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 14,
+  },
+  cityButton: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    flex: 1,
+    marginRight: 12,
+    minHeight: 58,
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+  },
+  cityButtonText: {
+    color: '#18324B',
+    fontSize: 15,
+    fontWeight: '800',
+  },
+  cityMeta: {
+    color: '#8293A5',
+    fontSize: 10,
+    marginTop: 4,
+  },
+  refreshArea: {
+    alignItems: 'flex-end',
+  },
+  refreshButton: {
+    alignItems: 'center',
+    backgroundColor: '#234968',
+    borderRadius: 15,
+    height: 38,
+    justifyContent: 'center',
+    minWidth: 78,
+    paddingHorizontal: 13,
+  },
+  refreshButtonText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  lastUpdated: {
+    color: '#8293A5',
+    fontSize: 9,
+    marginTop: 5,
+  },
+  toolbarButtonDisabled: {
+    opacity: 0.62,
   },
   section: {
     marginBottom: 16,

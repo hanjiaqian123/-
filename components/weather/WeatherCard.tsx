@@ -5,14 +5,17 @@ import type { CurrentWeather } from '../../types/models';
 type WeatherCardProps = {
   weather: CurrentWeather | null;
   isLoading: boolean;
+  cityName: string;
 };
 
-type WeatherDisplay = {
+export type WeatherDisplay = {
   text: string;
   icon: string;
 };
 
-function getWeatherDisplay(weather: CurrentWeather): WeatherDisplay {
+export function getWeatherDisplay(
+  weather: Pick<CurrentWeather, 'weather_code' | 'is_day'>
+): WeatherDisplay {
   const code = weather.weather_code;
   const isDay = weather.is_day === 1;
 
@@ -90,12 +93,13 @@ function getUvRisk(uvIndex: number): string {
 export default function WeatherCard({
   weather,
   isLoading,
+  cityName,
 }: WeatherCardProps) {
   const weatherDisplay = weather ? getWeatherDisplay(weather) : null;
 
   return (
     <View style={styles.weatherCard}>
-      <Text style={styles.city}>今日天气 · 长沙</Text>
+      <Text style={styles.city}>今日天气 · {cityName}</Text>
 
       <View style={styles.weatherMain}>
         <View>

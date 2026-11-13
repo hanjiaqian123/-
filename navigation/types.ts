@@ -23,6 +23,7 @@ export type RootStackParamList = {
     mimeType?: string | null;
   };
   OutfitResult: {
+    cityName: string;
     weather: CurrentWeather | null;
     recommendation: OutfitRecommendation | null;
   };
