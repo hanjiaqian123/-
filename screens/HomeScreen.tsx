@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useIsFocused } from '@react-navigation/native';
 import {
   ActivityIndicator,
   Pressable,
@@ -11,234 +12,27 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import CosmicBackground from '../components/cosmic/CosmicBackground';
 import OutfitCard from '../components/outfit/OutfitCard';
+import DailyOutfitPlan from '../components/outfit/DailyOutfitPlan';
 import CitySearch from '../components/weather/CitySearch';
 import HourlyWeatherForecast from '../components/weather/HourlyWeather';
 import WeatherCard from '../components/weather/WeatherCard';
 import type { ScreenProps } from '../navigation/types';
-import { fetchWeather } from '../services/weatherApi';
+import {
+  fetchWeather,
+  type WeatherSnapshotMetadata,
+} from '../services/weatherApi';
+import {
+  buildOutfitWeatherContext,
+  getOutfitRecommendations,
+} from '../services/outfitRecommendations';
 import { cosmicTheme } from '../theme/cosmicTheme';
 import type {
   CitySearchResult,
   CurrentWeather,
   HourlyWeather,
-  OutfitRecommendation,
   WeatherLocation,
 } from '../types/models';
 
-function getBaseOutfitRecommendations(
-  weather: CurrentWeather
-): OutfitRecommendation[] {
-  const temperature = weather.apparent_temperature;
-
-  if (temperature <= 8) {
-    return [
-      {
-        id: 'cold-warm',
-        title: '温暖保暖风',
-        description: '保暖、防风、舒适',
-        top: '🧥 厚外套或羽绒服',
-        bottom: '👖 加厚长裤',
-        shoes: '🥾 保暖运动鞋',
-        accessory: '🧣 围巾',
-        tip: '气温较低，建议做好保暖。如果有降雨，还要注意防水。',
-      },
-      {
-        id: 'cold-commute',
-        title: '都市保暖通勤风',
-        description: '利落、厚实、有质感',
-        top: '🧥 羊毛大衣搭配保暖针织衫',
-        bottom: '👖 加绒直筒长裤',
-        shoes: '🥾 防风短靴',
-        accessory: '🧤 保暖手套',
-        tip: '通勤时建议采用针织衫与大衣叠穿，兼顾室内外温差。',
-      },
-      {
-        id: 'cold-sport',
-        title: '冬日活力运动风',
-        description: '轻暖、灵活、有活力',
-        top: '🧥 抓绒卫衣搭配短款羽绒服',
-        bottom: '👖 加绒运动长裤',
-        shoes: '👟 保暖高帮运动鞋',
-        accessory: '🧢 针织帽',
-        tip: '户外活动可选择轻量羽绒与抓绒内层，方便运动又能减少热量流失。',
-      },
-    ];
-  }
-
-  if (temperature <= 15) {
-    return [
-      {
-        id: 'cool-layered',
-        title: '简约叠穿风',
-        description: '舒适、轻暖、有层次',
-        top: '🧥 卫衣或夹克',
-        bottom: '👖 休闲长裤',
-        shoes: '👟 运动鞋',
-        accessory: '🧢 轻便帽子',
-        tip: '天气偏凉，建议穿一件外套，避免着凉。',
-      },
-      {
-        id: 'cool-commute',
-        title: '利落轻通勤风',
-        description: '简洁、挺括、易叠穿',
-        top: '🧥 风衣搭配薄针织衫',
-        bottom: '👖 直筒西装长裤',
-        shoes: '👞 轻便乐福鞋',
-        accessory: '🧣 薄款围巾',
-        tip: '早晚偏凉时可以系上薄围巾，中午升温后脱下风衣即可。',
-      },
-      {
-        id: 'cool-sport',
-        title: '轻户外运动风',
-        description: '防风、灵活、休闲',
-        top: '🧥 防风外套搭配长袖运动衫',
-        bottom: '👖 束脚运动长裤',
-        shoes: '👟 缓震运动鞋',
-        accessory: '🎒 轻量双肩包',
-        tip: '选择方便活动的防风外层，运动后及时增添外套避免受凉。',
-      },
-    ];
-  }
-
-  if (temperature <= 22) {
-    return [
-      {
-        id: 'mild-casual',
-        title: '轻松休闲风',
-        description: '轻薄、透气、舒适',
-        top: '👕 长袖或薄外套',
-        bottom: '👖 休闲长裤',
-        shoes: '👟 休闲运动鞋',
-        accessory: '👜 轻便配饰',
-        tip: '气温比较舒适，适合轻薄衣物，可以根据早晚温差增减衣物。',
-      },
-      {
-        id: 'mild-commute',
-        title: '清爽轻熟通勤风',
-        description: '干净、轻盈、有质感',
-        top: '👔 衬衫搭配薄款针织开衫',
-        bottom: '👖 垂感直筒裤',
-        shoes: '👞 轻便通勤鞋',
-        accessory: '👜 简约单肩包',
-        tip: '薄开衫适合应对空调房和早晚温差，白天温暖时可以单穿衬衫。',
-      },
-      {
-        id: 'mild-outdoor',
-        title: '城市轻户外风',
-        description: '透气、实用、有层次',
-        top: '🧥 轻薄防晒外套搭配透气上衣',
-        bottom: '👖 宽松工装长裤',
-        shoes: '🥾 轻量徒步鞋',
-        accessory: '🧢 遮阳帽',
-        tip: '轻薄外层便于随时穿脱，适合步行、骑行或短时间户外活动。',
-      },
-    ];
-  }
-
-  return [
-    {
-      id: 'hot-summer',
-      title: '清爽夏日风',
-      description: '清凉、透气、轻便',
-      top: '👕 透气短袖',
-      bottom: '🩳 轻薄休闲裤',
-      shoes: '👟 透气运动鞋',
-      accessory: '🕶️ 太阳镜',
-      tip: '天气较热，建议选择透气面料，注意防晒和补水。',
-    },
-    {
-      id: 'hot-commute',
-      title: '轻盈夏日通勤风',
-      description: '清爽、利落、不闷热',
-      top: '👔 亚麻短袖衬衫',
-      bottom: '👖 轻薄垂感长裤',
-      shoes: '👞 透气便鞋',
-      accessory: '👜 轻量通勤包',
-      tip: '选择亚麻或速干面料，进入空调环境时可准备一件轻薄外搭。',
-    },
-    {
-      id: 'hot-sport',
-      title: '活力速干运动风',
-      description: '速干、轻量、方便活动',
-      top: '🎽 速干运动上衣',
-      bottom: '🩳 透气运动短裤',
-      shoes: '👟 网面跑步鞋',
-      accessory: '🧢 防晒运动帽',
-      tip: '户外运动尽量避开高温时段，并及时补水和做好防晒。',
-    },
-  ];
-}
-
-function getOutfitRecommendations(
-  weather: CurrentWeather
-): OutfitRecommendation[] {
-  const code = weather.weather_code;
-  const isSnowy =
-    (code >= 71 && code <= 77) ||
-    (code >= 85 && code <= 86);
-  const isFreezingRain = code >= 66 && code <= 67;
-  const isThunderstorm = code >= 95 && code <= 99;
-  const isRainy =
-    (code >= 51 && code <= 65) ||
-    (code >= 80 && code <= 82) ||
-    isFreezingRain ||
-    isThunderstorm ||
-    weather.precipitation > 0;
-  const isWindy = weather.wind_speed_10m >= 30;
-
-  const baseWeather =
-    isSnowy || isFreezingRain
-      ? {
-          ...weather,
-          apparent_temperature: Math.min(weather.apparent_temperature, 8),
-        }
-      : weather;
-
-  return getBaseOutfitRecommendations(baseWeather).map((recommendation) => {
-    if (isSnowy || isFreezingRain) {
-      return {
-        ...recommendation,
-        description: `防寒、防滑、保暖 · ${recommendation.description}`,
-        top: `🧥 防水保暖外层 + ${recommendation.top.replace(/^\S+\s*/, '')}`,
-        bottom: '👖 防风保暖长裤',
-        shoes: '🥾 防水防滑保暖靴',
-        accessory: '🧣 保暖围巾与手套',
-        tip: `当前有${isFreezingRain ? '冻雨' : '降雪'}，优先防水、防滑和保暖。${recommendation.tip}`,
-      };
-    }
-
-    if (isRainy) {
-      return {
-        ...recommendation,
-        description: `${
-          isWindy ? '防水、防风' : '防水、便捷'
-        }、舒适 · ${recommendation.description}`,
-        top: `🌧️ ${
-          isWindy ? '防水防风外套' : '轻便防水外套'
-        } + ${recommendation.top.replace(/^\S+\s*/, '')}`,
-        shoes: '🥾 防水防滑鞋',
-        accessory: isWindy ? '🧢 连帽雨衣' : '☂️ 折叠伞',
-        tip: `${
-          isThunderstorm ? '雷雨天气请减少户外停留，' : ''
-        }${
-          isWindy ? '风雨较强时用连帽雨衣代替雨伞，' : ''
-        }穿搭已加入雨具和防水鞋。${recommendation.tip}`,
-      };
-    }
-
-    if (isWindy) {
-      return {
-        ...recommendation,
-        description: `防风、利落、舒适 · ${recommendation.description}`,
-        top: `🧥 防风外层 + ${recommendation.top.replace(/^\S+\s*/, '')}`,
-        accessory: '🧢 贴合防风帽',
-        tip: `当前风速较高，优先选择收口、防风且不易飘动的单品。${recommendation.tip}`,
-      };
-    }
-
-    return recommendation;
-  });
-}
 
 const DEFAULT_CITY: WeatherLocation = {
   name: '长沙',
@@ -249,30 +43,43 @@ const DEFAULT_CITY: WeatherLocation = {
   timezone: 'Asia/Shanghai',
 };
 
-function formatLastUpdated(date: Date | null): string {
-  if (!date) {
+function formatWeatherDataTime(value?: string): string {
+  if (!value) {
     return '等待首次更新';
   }
 
-  const hours = String(date.getHours()).padStart(2, '0');
-  const minutes = String(date.getMinutes()).padStart(2, '0');
-  return `更新于 ${hours}:${minutes}`;
+  const match = value.match(
+    /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/
+  );
+  if (!match) {
+    return `数据时间 ${value}`;
+  }
+
+  return `数据时间 ${match[2]}-${match[3]} ${match[4]}:${match[5]}`;
 }
 
 export default function HomeScreen({ navigation }: ScreenProps<'Home'>) {
+  const isFocused = useIsFocused();
   const [weather, setWeather] = useState<CurrentWeather | null>(null);
   const [hourlyWeather, setHourlyWeather] = useState<HourlyWeather[]>([]);
+  const [forecastMetadata, setForecastMetadata] =
+    useState<WeatherSnapshotMetadata | null>(null);
   const [selectedCity, setSelectedCity] =
     useState<WeatherLocation>(DEFAULT_CITY);
   const [isCitySearchVisible, setIsCitySearchVisible] = useState(false);
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [weatherError, setWeatherError] = useState<string | null>(null);
+  const [isWeatherStale, setIsWeatherStale] = useState(false);
   const [primaryRecommendationIndex, setPrimaryRecommendationIndex] =
     useState(0);
   const weatherRequestInFlight = useRef(false);
+  const hasWeatherSnapshot = useRef(false);
 
-  const recommendations = weather ? getOutfitRecommendations(weather) : [];
+  const recommendations = weather
+    ? getOutfitRecommendations(
+        buildOutfitWeatherContext(weather, hourlyWeather)
+      )
+    : [];
   const orderedRecommendations = recommendations.map(
     (_, index) =>
       recommendations[
@@ -301,10 +108,12 @@ export default function HomeScreen({ navigation }: ScreenProps<'Home'>) {
 
         setWeather(forecast.current);
         setHourlyWeather(forecast.hourly);
+        setForecastMetadata(forecast.metadata);
         if (updateSelectedCity) {
           setSelectedCity(targetCity);
         }
-        setLastUpdated(new Date());
+        hasWeatherSnapshot.current = true;
+        setIsWeatherStale(false);
         setPrimaryRecommendationIndex(0);
         return true;
       } catch (error) {
@@ -312,6 +121,7 @@ export default function HomeScreen({ navigation }: ScreenProps<'Home'>) {
         setWeatherError(
           error instanceof Error ? error.message : '天气获取失败，请稍后重试'
         );
+        setIsWeatherStale(hasWeatherSnapshot.current);
         return false;
       } finally {
         weatherRequestInFlight.current = false;
@@ -350,7 +160,7 @@ export default function HomeScreen({ navigation }: ScreenProps<'Home'>) {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <CosmicBackground>
+      <CosmicBackground motionEnabled={isFocused}>
       <ScrollView
         contentContainerStyle={styles.pageContent}
         showsVerticalScrollIndicator={false}
@@ -403,7 +213,7 @@ export default function HomeScreen({ navigation }: ScreenProps<'Home'>) {
               )}
             </Pressable>
             <Text style={styles.lastUpdated}>
-              {formatLastUpdated(lastUpdated)}
+              {formatWeatherDataTime(forecastMetadata?.currentTime)}
             </Text>
           </View>
         </View>
@@ -412,6 +222,8 @@ export default function HomeScreen({ navigation }: ScreenProps<'Home'>) {
           cityName={selectedCity.name}
           weather={weather}
           isLoading={isLoading}
+          isStale={isWeatherStale}
+          dataTimeLabel={formatWeatherDataTime(forecastMetadata?.currentTime)}
         />
 
         {weatherError ? (
@@ -441,9 +253,21 @@ export default function HomeScreen({ navigation }: ScreenProps<'Home'>) {
         </View>
 
         <View style={styles.section}>
+          <DailyOutfitPlan
+            hourly={hourlyWeather}
+            cityName={selectedCity.name}
+            timezone={forecastMetadata?.timezone ?? selectedCity.timezone}
+            utcOffsetSeconds={forecastMetadata?.utcOffsetSeconds}
+            isLoading={isLoading}
+            weatherError={weatherError}
+            lastUpdated={null}
+            active={isFocused}
+            onOpenWardrobe={() => navigation.navigate('Wardrobe')}
+          />
+          <Text style={styles.outfitEyebrow}>YOUR DAILY EDIT</Text>
           <Text style={styles.sectionTitle}>今日穿搭推荐</Text>
           <Text style={styles.sectionSubtitle}>
-            根据天气，找到今天最适合你的穿搭
+            跟随此刻天气，探索今天的三种风格
           </Text>
         </View>
 
@@ -451,6 +275,7 @@ export default function HomeScreen({ navigation }: ScreenProps<'Home'>) {
           orderedRecommendations.map((recommendation, index) => (
             <OutfitCard
               isPrimary={index === 0}
+              position={index + 1}
               key={recommendation.id}
               onChangeOutfit={
                 index === 0 ? showNextRecommendation : undefined
@@ -502,6 +327,20 @@ export default function HomeScreen({ navigation }: ScreenProps<'Home'>) {
           </Pressable>
         </View>
 
+        <Pressable
+          accessibilityLabel="打开宇宙探索"
+          accessibilityRole="button"
+          onPress={() => navigation.navigate('CosmicExplore')}
+          style={({ pressed }) => [styles.exploreEntry, pressed && styles.buttonPressed]}
+        >
+          <Text style={styles.exploreIcon}>✦</Text>
+          <View style={styles.exploreCopy}>
+            <Text style={styles.exploreTitle}>宇宙探索</Text>
+            <Text style={styles.exploreDescription}>从今天的天气，出发去看宇宙</Text>
+          </View>
+          <Text style={styles.exploreArrow}>↗</Text>
+        </Pressable>
+
         <Text style={styles.footer}>WeatherFit · 让每天穿搭更简单</Text>
       </ScrollView>
 
@@ -520,6 +359,17 @@ const styles = StyleSheet.create({
     backgroundColor: '#F3F6FA',
     flex: 1,
   },
+  exploreEntry: {
+    flexDirection: 'row', alignItems: 'center', gap: 15,
+    backgroundColor: cosmicTheme.colors.explorePanel,
+    borderColor: cosmicTheme.colors.cardBorder, borderWidth: 1,
+    borderRadius: 20, padding: 18, marginTop: 18, minHeight: 88,
+  },
+  exploreIcon: { color: cosmicTheme.colors.violetLight, fontSize: 27 },
+  exploreCopy: { flex: 1 },
+  exploreTitle: { color: cosmicTheme.colors.textPrimary, fontSize: 16, fontWeight: '700' },
+  exploreDescription: { color: cosmicTheme.colors.textSecondary, fontSize: 10, lineHeight: 18, marginTop: 5 },
+  exploreArrow: { color: cosmicTheme.colors.softStarlight, fontSize: 22 },
   page: {
     backgroundColor: 'transparent',
     flex: 1,
@@ -600,6 +450,13 @@ const styles = StyleSheet.create({
   },
   section: {
     marginBottom: 16,
+  },
+  outfitEyebrow: {
+    color: cosmicTheme.colors.violetLight,
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 2.4,
+    marginBottom: 8,
   },
   sectionTitle: {
     color: cosmicTheme.colors.textPrimary,

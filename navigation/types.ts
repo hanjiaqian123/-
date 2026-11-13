@@ -8,6 +8,7 @@ import type {
 
 export type RootStackParamList = {
   Home: undefined;
+  CosmicExplore: undefined;
   Wardrobe: undefined;
   Upload: undefined;
   Processing: {

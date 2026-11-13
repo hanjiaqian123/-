@@ -11,6 +11,8 @@ export type CurrentWeather = {
 
 export type HourlyWeather = {
   time: string;
+  apparent_temperature?: number;
+  wind_speed_10m?: number;
   temperature_2m: number;
   relative_humidity_2m: number;
   precipitation_probability: number;

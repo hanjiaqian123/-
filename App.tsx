@@ -5,11 +5,13 @@ import { StatusBar } from 'expo-status-bar';
 import { WardrobeProvider } from './context/WardrobeContext';
 import type { RootStackParamList } from './navigation/types';
 import HomeScreen from './screens/HomeScreen';
+import CosmicExploreScreen from './screens/CosmicExploreScreen';
 import OutfitResultScreen from './screens/OutfitResultScreen';
 import ProcessingScreen from './screens/ProcessingScreen';
 import RecognitionResultScreen from './screens/RecognitionResultScreen';
 import UploadScreen from './screens/UploadScreen';
 import WardrobeScreen from './screens/WardrobeScreen';
+import { cosmicTheme } from './theme/cosmicTheme';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -33,6 +35,17 @@ export default function App() {
             component={HomeScreen}
             name="Home"
             options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            component={CosmicExploreScreen}
+            name="CosmicExplore"
+            options={{
+              title: '宇宙探索',
+              headerStyle: { backgroundColor: cosmicTheme.colors.deepSpace },
+              headerTintColor: cosmicTheme.colors.textPrimary,
+              contentStyle: { backgroundColor: cosmicTheme.colors.deepSpace },
+              statusBarStyle: 'light',
+            }}
           />
           <Stack.Screen
             component={WardrobeScreen}

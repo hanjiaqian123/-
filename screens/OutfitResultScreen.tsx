@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useLayoutEffect, useState } from 'react';
+import { useIsFocused } from '@react-navigation/native';
 import {
   Image,
   Pressable,
@@ -7,9 +8,57 @@ import {
   Text,
   View,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
+import CosmicBackground from '../components/cosmic/CosmicBackground';
+import {
+  OutfitMetadata,
+  OutfitPieces,
+} from '../components/outfit/OutfitPresentation';
+import OutfitReveal from '../components/outfit/OutfitReveal';
+import { getWeatherDisplay } from '../components/weather/WeatherCard';
 import { useWardrobe } from '../context/WardrobeContext';
 import type { ScreenProps } from '../navigation/types';
+import { cosmicTheme } from '../theme/cosmicTheme';
+import type { WardrobeItem } from '../types/models';
+
+function WardrobeOutfitItem({
+  item,
+  index,
+}: {
+  item: WardrobeItem;
+  index: number;
+}) {
+  const [hasImageError, setHasImageError] = useState(false);
+  const isLead = index === 0;
+
+  return (
+    <View style={[styles.outfitItem, isLead && styles.outfitItemLead]}>
+      <View style={styles.itemHeader}>
+        <Text style={styles.itemNumber}>0{index + 1}</Text>
+        <Text style={styles.itemCategory}>{item.category}</Text>
+      </View>
+      {hasImageError ? (
+        <View style={[styles.missingImage, isLead && styles.leadImage]}>
+          <Text style={styles.missingImageText}>图片暂不可用</Text>
+        </View>
+      ) : (
+        <Image
+          accessibilityLabel={`${item.name}照片`}
+          onError={() => setHasImageError(true)}
+          resizeMode="contain"
+          source={{ uri: item.imageUri }}
+          style={[styles.itemImage, isLead && styles.leadImage]}
+        />
+      )}
+      <View style={styles.itemCopy}>
+        <Text style={styles.itemName}>{item.name}</Text>
+        <Text style={styles.itemColor}>{item.color}</Text>
+      </View>
+    </View>
+  );
+}
 
 export default function OutfitResultScreen({
   navigation,
@@ -18,6 +67,16 @@ export default function OutfitResultScreen({
   const { items } = useWardrobe();
   const [variant, setVariant] = useState(0);
   const { cityName, recommendation, weather } = route.params;
+  const isFocused = useIsFocused();
+  const weatherDisplay = weather ? getWeatherDisplay(weather) : null;
+
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerStyle: { backgroundColor: cosmicTheme.colors.deepSpace },
+      headerTintColor: cosmicTheme.colors.textPrimary,
+      statusBarStyle: 'light',
+    });
+  }, [navigation]);
 
   const selectedItems = items
     .map((_, index) => items[(index + variant) % items.length])
@@ -30,132 +89,156 @@ export default function OutfitResultScreen({
   }
 
   return (
-    <ScrollView
-      contentContainerStyle={styles.content}
-      showsVerticalScrollIndicator={false}
-      style={styles.page}
-    >
-      <View style={styles.weatherBanner}>
-        <View>
-          <Text style={styles.weatherLabel}>{cityName} · 当前天气</Text>
-          <Text style={styles.weatherValue}>
-            {weather ? `${Math.round(weather.temperature_2m)}°` : '--°'}
-          </Text>
-        </View>
-        <View style={styles.weatherMeta}>
-          <Text style={styles.weatherMetaText}>
-            体感 {weather ? `${weather.apparent_temperature}°C` : '暂无'}
-          </Text>
-          <Text style={styles.weatherMetaText}>
-            风速 {weather ? `${weather.wind_speed_10m} km/h` : '暂无'}
-          </Text>
-        </View>
-      </View>
-
-      <View style={styles.headingRow}>
-        <View style={styles.headingCopy}>
-          <Text style={styles.eyebrow}>SMART OUTFIT</Text>
-          <Text style={styles.title}>
-            {recommendation?.title ?? '日常轻松搭配'}
-          </Text>
-        </View>
-        <View style={styles.matchBadge}>
-          <Text style={styles.matchValue}>92%</Text>
-          <Text style={styles.matchLabel}>MATCH</Text>
-        </View>
-      </View>
-
-      <Text style={styles.subtitle}>
-        结合首页实时天气建议和你保存在本机的真实衣橱，为今天生成示例组合。
-      </Text>
-
-      {selectedItems.length > 0 ? (
-        <View style={styles.outfitCanvas}>
-          {selectedItems.map((item, index) => (
-            <View
-              key={`${item.id}-${index}`}
-              style={[styles.outfitItem, index === 0 && styles.outfitItemLead]}
-            >
-              <Image
-                accessibilityLabel={`${item.name}照片`}
-                resizeMode="cover"
-                source={{ uri: item.imageUri }}
-                style={styles.itemImage}
-              />
-              <View style={styles.itemCopy}>
-                <Text style={styles.itemCategory}>{item.category}</Text>
-                <Text numberOfLines={1} style={styles.itemName}>
-                  {item.name}
+    <CosmicBackground motionEnabled={isFocused}>
+      <SafeAreaView edges={['bottom', 'left', 'right']} style={styles.page}>
+        <ScrollView
+          contentContainerStyle={styles.content}
+          showsVerticalScrollIndicator={false}
+          style={styles.page}
+        >
+          <OutfitReveal motionEnabled={isFocused}>
+            <View style={styles.headingRow}>
+              <View style={styles.headingCopy}>
+                <Text style={styles.eyebrow}>THE COSMIC EDIT</Text>
+                <Text style={styles.title}>
+                  {recommendation?.title ?? '日常轻松搭配'}
                 </Text>
-                <Text style={styles.itemColor}>{item.color}</Text>
+              </View>
+              <View style={styles.matchBadge}>
+                <Text style={styles.matchValue}>92%</Text>
+                <Text style={styles.matchLabel}>示例匹配</Text>
               </View>
             </View>
-          ))}
-        </View>
-      ) : (
-        <View style={styles.emptyWardrobe}>
-          <Text style={styles.emptyWardrobeIcon}>👚</Text>
-          <Text style={styles.emptyWardrobeTitle}>衣橱里还没有衣服</Text>
-          <Text style={styles.emptyWardrobeText}>
-            先添加真实衣服照片，才能生成基于衣橱的搭配。
-          </Text>
+            <Text style={styles.subtitle}>
+              结合首页天气建议与本机衣橱，为今天探索一组穿搭灵感。
+            </Text>
+            <OutfitMetadata recommendation={recommendation} />
+
+            <LinearGradient
+              colors={cosmicTheme.gradients.outfitSecondary}
+              end={{ x: 1, y: 1 }}
+              start={{ x: 0, y: 0 }}
+              style={styles.weatherBanner}
+            >
+              <View style={styles.weatherLocation}>
+                <Text style={styles.weatherLabel}>{cityName} · 当前天气</Text>
+                <Text style={styles.weatherValue}>
+                  {weather ? `${Math.round(weather.temperature_2m)}°` : '--°'}
+                </Text>
+                <Text style={styles.weatherMetaText}>
+                  {weatherDisplay
+                    ? `${weatherDisplay.icon} ${weatherDisplay.text}`
+                    : '暂无天气数据'}
+                </Text>
+              </View>
+              <View style={styles.weatherMeta}>
+                <Text style={styles.weatherMetaText}>
+                  体感 {weather ? `${weather.apparent_temperature}°C` : '暂无'}
+                </Text>
+                <Text style={styles.weatherMetaText}>
+                  风速 {weather ? `${weather.wind_speed_10m} km/h` : '暂无'}
+                </Text>
+              </View>
+            </LinearGradient>
+          </OutfitReveal>
+
+          <View style={styles.sectionHeading}>
+            <View style={styles.headingCopy}>
+              <Text style={styles.eyebrow}>FROM YOUR WARDROBE</Text>
+              <Text style={styles.sectionTitle}>衣橱示例组合</Text>
+            </View>
+            <Text style={styles.countBadge}>{selectedItems.length} 件单品</Text>
+          </View>
+
+          {selectedItems.length > 0 ? (
+            <OutfitReveal
+              motionEnabled={isFocused}
+              replayKey={variant}
+              style={styles.outfitCanvas}
+            >
+              {selectedItems.map((item, index) => (
+                <WardrobeOutfitItem
+                  index={index}
+                  item={item}
+                  key={`${item.id}-${item.imageUri}-${index}`}
+                />
+              ))}
+            </OutfitReveal>
+          ) : (
+            <View style={styles.emptyWardrobe}>
+              <Text style={styles.emptyWardrobeIcon}>👚</Text>
+              <Text style={styles.emptyWardrobeTitle}>衣橱里还没有衣服</Text>
+              <Text style={styles.emptyWardrobeText}>
+                先添加真实衣服照片，才能生成基于衣橱的搭配。
+              </Text>
+              <Pressable
+                accessibilityLabel="前往添加衣服"
+                accessibilityRole="button"
+                onPress={() => navigation.navigate('Upload')}
+                style={({ pressed }) => [
+                  styles.emptyWardrobeButton,
+                  pressed && styles.pressed,
+                ]}
+              >
+                <Text style={styles.primaryButtonText}>添加衣服</Text>
+              </Pressable>
+            </View>
+          )}
+
           <Pressable
-            accessibilityLabel="前往添加衣服"
+            accessibilityLabel="更换一套衣橱组合"
             accessibilityRole="button"
-            onPress={() => navigation.navigate('Upload')}
+            disabled={items.length < 2}
+            onPress={showNextCombination}
             style={({ pressed }) => [
-              styles.emptyWardrobeButton,
+              styles.primaryButton,
+              items.length < 2 && styles.primaryButtonDisabled,
               pressed && styles.pressed,
             ]}
           >
-            <Text style={styles.emptyWardrobeButtonText}>添加衣服</Text>
+            <Text style={styles.primaryButtonText}>↻ 换一套衣橱组合</Text>
           </Pressable>
-        </View>
-      )}
+          {items.length < 2 ? (
+            <Text style={styles.buttonHint}>添加至少两件单品，即可切换组合</Text>
+          ) : null}
 
-      <View style={styles.adviceCard}>
-        <Text style={styles.adviceIcon}>💡</Text>
-        <View style={styles.adviceCopy}>
-          <Text style={styles.adviceTitle}>搭配说明</Text>
-          <Text style={styles.adviceText}>
-            {recommendation?.tip ??
-              '天气暂未加载完成，当前先展示衣橱中的日常组合。'}
-          </Text>
-        </View>
-      </View>
+          <View style={styles.adviceCard}>
+            <Text style={styles.eyebrow}>WHY THIS LOOK</Text>
+            <Text style={styles.adviceTitle}>搭配理由 · 天气适配</Text>
+            <Text style={styles.adviceText}>
+              {recommendation?.tip ??
+                '天气暂未加载完成，当前先展示衣橱中的日常组合。'}
+            </Text>
+          </View>
 
-      <Pressable
-        accessibilityLabel="更换一套衣橱组合"
-        accessibilityRole="button"
-        disabled={items.length < 2}
-        onPress={showNextCombination}
-        style={({ pressed }) => [
-          styles.primaryButton,
-          items.length < 2 && styles.primaryButtonDisabled,
-          pressed && styles.pressed,
-        ]}
-      >
-        <Text style={styles.primaryButtonText}>↻ 换一套衣橱组合</Text>
-      </Pressable>
+          {recommendation ? (
+            <View style={styles.recommendedPieces}>
+              <Text style={styles.eyebrow}>WEATHER ESSENTIALS</Text>
+              <Text style={styles.sectionTitle}>天气推荐单品</Text>
+              <OutfitPieces recommendation={recommendation} />
+            </View>
+          ) : null}
 
-      <Pressable
-        accessibilityLabel="返回首页"
-        accessibilityRole="button"
-        onPress={() => navigation.popToTop()}
-        style={({ pressed }) => [
-          styles.secondaryButton,
-          pressed && styles.pressed,
-        ]}
-      >
-        <Text style={styles.secondaryButtonText}>返回首页</Text>
-      </Pressable>
-    </ScrollView>
+          <Pressable
+            accessibilityLabel="返回首页"
+            accessibilityRole="button"
+            onPress={() => navigation.popToTop()}
+            style={({ pressed }) => [
+              styles.secondaryButton,
+              pressed && styles.pressed,
+            ]}
+          >
+            <Text style={styles.secondaryButtonText}>返回首页</Text>
+          </Pressable>
+        </ScrollView>
+      </SafeAreaView>
+    </CosmicBackground>
   );
 }
 
 const styles = StyleSheet.create({
   page: {
-    backgroundColor: '#F3F6FA',
+    backgroundColor: 'transparent',
     flex: 1,
   },
   content: {
@@ -164,18 +247,26 @@ const styles = StyleSheet.create({
   },
   weatherBanner: {
     alignItems: 'center',
-    backgroundColor: '#234968',
+    borderColor: cosmicTheme.colors.cardBorder,
     borderRadius: 22,
+    borderWidth: 1,
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 18,
     justifyContent: 'space-between',
+    marginTop: 22,
     padding: 20,
   },
+  weatherLocation: {
+    flex: 1,
+    minWidth: 110,
+  },
   weatherLabel: {
-    color: '#D9EAF7',
+    color: cosmicTheme.colors.textSecondary,
     fontSize: 12,
   },
   weatherValue: {
-    color: '#FFFFFF',
+    color: cosmicTheme.colors.textPrimary,
     fontSize: 42,
     fontWeight: '300',
     marginTop: 4,
@@ -185,187 +276,250 @@ const styles = StyleSheet.create({
     gap: 7,
   },
   weatherMetaText: {
-    color: '#FFFFFF',
+    color: cosmicTheme.colors.softStarlight,
     fontSize: 12,
   },
   headingRow: {
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 26,
+    gap: 12,
+    marginTop: 4,
   },
   headingCopy: {
     flex: 1,
   },
   eyebrow: {
-    color: '#6AA5C9',
+    color: cosmicTheme.colors.violetLight,
     fontSize: 10,
     fontWeight: '800',
     letterSpacing: 2,
   },
   title: {
-    color: '#18324B',
+    color: cosmicTheme.colors.textPrimary,
     fontSize: 25,
     fontWeight: '800',
     marginTop: 7,
+    lineHeight: 35,
   },
   matchBadge: {
     alignItems: 'center',
-    backgroundColor: '#E7F5ED',
+    backgroundColor: cosmicTheme.colors.outfitAccent,
+    borderColor: cosmicTheme.colors.cardBorder,
     borderRadius: 16,
-    marginLeft: 12,
+    borderWidth: 1,
     paddingHorizontal: 13,
     paddingVertical: 9,
   },
   matchValue: {
-    color: '#27845C',
-    fontSize: 15,
+    color: cosmicTheme.colors.textPrimary,
+    fontSize: 21,
     fontWeight: '900',
   },
   matchLabel: {
-    color: '#5A8E75',
-    fontSize: 8,
+    color: cosmicTheme.colors.violetLight,
+    fontSize: 10,
     fontWeight: '800',
     letterSpacing: 1,
     marginTop: 2,
   },
   subtitle: {
-    color: '#8293A5',
+    color: cosmicTheme.colors.textSecondary,
     fontSize: 13,
     lineHeight: 20,
     marginTop: 9,
   },
   outfitCanvas: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 22,
+    alignItems: 'stretch',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 10,
-    marginTop: 20,
-    padding: 14,
+    marginTop: 14,
   },
   outfitItem: {
-    alignItems: 'center',
-    backgroundColor: '#F3F6FA',
-    borderRadius: 16,
-    flexDirection: 'row',
-    padding: 14,
+    backgroundColor: cosmicTheme.colors.outfitPanel,
+    borderColor: cosmicTheme.colors.cardBorder,
+    borderRadius: 20,
+    borderWidth: 1,
+    flexBasis: '46%',
+    flexGrow: 1,
+    minWidth: 0,
+    overflow: 'hidden',
+    padding: 12,
   },
   outfitItemLead: {
-    backgroundColor: '#EAF4FA',
+    flexBasis: '100%',
+  },
+  itemHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  itemNumber: {
+    color: cosmicTheme.colors.softStarlight,
+    fontSize: 10,
+    letterSpacing: 2,
   },
   itemImage: {
+    backgroundColor: cosmicTheme.colors.outfitSurface,
     borderRadius: 12,
-    height: 58,
-    width: 58,
+    height: 150,
+    width: '100%',
+  },
+  leadImage: {
+    height: 230,
+  },
+  missingImage: {
+    alignItems: 'center',
+    backgroundColor: cosmicTheme.colors.outfitSurface,
+    borderRadius: 12,
+    height: 150,
+    justifyContent: 'center',
+    width: '100%',
+  },
+  missingImageText: {
+    color: cosmicTheme.colors.textSecondary,
+    fontSize: 12,
   },
   itemCopy: {
-    flex: 1,
-    marginLeft: 7,
+    marginTop: 12,
+    paddingBottom: 4,
   },
   itemCategory: {
-    color: '#6AA5C9',
+    color: cosmicTheme.colors.violetLight,
     fontSize: 10,
     fontWeight: '800',
   },
   itemName: {
-    color: '#18324B',
-    fontSize: 15,
+    color: cosmicTheme.colors.textPrimary,
+    fontSize: 14,
     fontWeight: '800',
     marginTop: 3,
+    lineHeight: 22,
   },
   itemColor: {
-    color: '#8293A5',
+    color: cosmicTheme.colors.textSecondary,
     fontSize: 11,
     marginTop: 4,
   },
   adviceCard: {
-    backgroundColor: '#FFF8E8',
-    borderRadius: 18,
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 16,
-    padding: 16,
-  },
-  adviceIcon: {
-    fontSize: 20,
-  },
-  adviceCopy: {
-    flex: 1,
+    backgroundColor: cosmicTheme.colors.outfitPanel,
+    borderColor: cosmicTheme.colors.cardBorder,
+    borderRadius: 20,
+    borderWidth: 1,
+    marginTop: 24,
+    padding: 20,
   },
   adviceTitle: {
-    color: '#8C6716',
-    fontSize: 13,
+    color: cosmicTheme.colors.textPrimary,
+    fontSize: 17,
     fontWeight: '800',
+    marginTop: 10,
   },
   adviceText: {
-    color: '#715E35',
-    fontSize: 12,
-    lineHeight: 19,
-    marginTop: 4,
+    color: cosmicTheme.colors.textSecondary,
+    fontSize: 13,
+    lineHeight: 23,
+    marginTop: 10,
   },
   primaryButton: {
     alignItems: 'center',
-    backgroundColor: '#234968',
+    backgroundColor: cosmicTheme.colors.outfitButton,
     borderRadius: 16,
     marginTop: 22,
     paddingVertical: 15,
+    minHeight: 48,
   },
   primaryButtonDisabled: {
-    backgroundColor: '#B6C2CC',
+    backgroundColor: cosmicTheme.colors.outfitDisabled,
   },
   primaryButtonText: {
-    color: '#FFFFFF',
+    color: cosmicTheme.colors.textPrimary,
     fontSize: 15,
     fontWeight: '800',
   },
   secondaryButton: {
     alignItems: 'center',
-    borderColor: '#B8C6D1',
+    borderColor: cosmicTheme.colors.cardBorder,
     borderRadius: 16,
     borderWidth: 1,
-    marginTop: 12,
+    marginTop: 24,
     paddingVertical: 14,
+    minHeight: 48,
   },
   secondaryButtonText: {
-    color: '#53677B',
+    color: cosmicTheme.colors.textSecondary,
     fontSize: 14,
     fontWeight: '700',
   },
   emptyWardrobe: {
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: cosmicTheme.colors.outfitPanel,
+    borderColor: cosmicTheme.colors.cardBorder,
+    borderWidth: 1,
     borderRadius: 22,
-    marginTop: 20,
+    marginTop: 14,
     padding: 28,
   },
   emptyWardrobeIcon: {
     fontSize: 48,
   },
   emptyWardrobeTitle: {
-    color: '#18324B',
+    color: cosmicTheme.colors.textPrimary,
     fontSize: 17,
     fontWeight: '800',
     marginTop: 13,
   },
   emptyWardrobeText: {
-    color: '#8293A5',
+    color: cosmicTheme.colors.textSecondary,
     fontSize: 12,
     lineHeight: 19,
     marginTop: 7,
     textAlign: 'center',
   },
   emptyWardrobeButton: {
-    backgroundColor: '#234968',
+    backgroundColor: cosmicTheme.colors.outfitButton,
     borderRadius: 14,
     marginTop: 17,
     paddingHorizontal: 20,
     paddingVertical: 11,
   },
-  emptyWardrobeButtonText: {
-    color: '#FFFFFF',
-    fontSize: 13,
-    fontWeight: '800',
-  },
   pressed: {
-    opacity: 0.72,
+    opacity: 0.8,
+    transform: [{ scale: 0.985 }],
+  },
+  sectionHeading: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginTop: 28,
+  },
+  sectionTitle: {
+    color: cosmicTheme.colors.textPrimary,
+    fontSize: 20,
+    fontWeight: '700',
+    marginTop: 8,
+  },
+  countBadge: {
+    color: cosmicTheme.colors.softStarlight,
+    fontSize: 11,
+  },
+  buttonHint: {
+    color: cosmicTheme.colors.textSecondary,
+    fontSize: 11,
+    marginTop: 9,
+    textAlign: 'center',
+  },
+  recommendedPieces: {
+    backgroundColor: cosmicTheme.colors.outfitPanel,
+    borderColor: cosmicTheme.colors.cardDivider,
+    borderRadius: 20,
+    borderWidth: 1,
+    marginTop: 16,
+    padding: 20,
   },
 });

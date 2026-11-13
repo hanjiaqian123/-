@@ -1,5 +1,6 @@
-import { type ReactNode, useEffect } from 'react';
+import { type ReactNode, useEffect, useState } from 'react';
 import {
+  AppState,
   type DimensionValue,
   StyleSheet,
   View,
@@ -18,10 +19,13 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { cosmicTheme } from '../../theme/cosmicTheme';
+import CosmicPlanet from './CosmicPlanet';
 
 type CosmicBackgroundProps = {
   children: ReactNode;
   motionEnabled?: boolean;
+  showPlanet?: boolean;
+  galaxyBandOpacity?: number;
 };
 
 type StarConfig = {
@@ -114,10 +118,22 @@ function TwinklingStar({
 export default function CosmicBackground({
   children,
   motionEnabled = true,
+  showPlanet = true,
+  galaxyBandOpacity = 1,
 }: CosmicBackgroundProps) {
   const reduceMotion = useReducedMotion();
-  const shouldAnimate = motionEnabled && !reduceMotion;
+  const [isAppActive, setIsAppActive] = useState(
+    () => AppState.currentState !== 'background' && AppState.currentState !== 'inactive'
+  );
+  const shouldAnimate = motionEnabled && isAppActive && !reduceMotion;
   const nebulaProgress = useSharedValue(0);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => {
+      setIsAppActive(state === 'active');
+    });
+    return () => subscription.remove();
+  }, []);
 
   useEffect(() => {
     cancelAnimation(nebulaProgress);
@@ -181,10 +197,18 @@ export default function CosmicBackground({
           style={StyleSheet.absoluteFill}
         />
 
-        <Animated.View
+        <Animated.Image
+          accessible={false}
+          fadeDuration={0}
+          resizeMode="contain"
+          source={require('../../assets/cosmic/nebula.png')}
           style={[styles.nebula, styles.upperNebula, upperNebulaStyle]}
         />
-        <Animated.View
+        <Animated.Image
+          accessible={false}
+          fadeDuration={0}
+          resizeMode="contain"
+          source={require('../../assets/cosmic/nebula.png')}
           style={[styles.nebula, styles.lowerNebula, lowerNebulaStyle]}
         />
 
@@ -192,8 +216,10 @@ export default function CosmicBackground({
           colors={cosmicTheme.gradients.galaxy}
           end={{ x: 1, y: 1 }}
           start={{ x: 0, y: 0.15 }}
-          style={styles.galaxyBand}
+          style={[styles.galaxyBand, { opacity: galaxyBandOpacity }]}
         />
+
+        {showPlanet ? <CosmicPlanet motionEnabled={shouldAnimate} /> : null}
 
         {STAR_CONFIGS.map((config, index) => (
           <TwinklingStar
@@ -225,22 +251,19 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   nebula: {
-    borderRadius: 999,
     position: 'absolute',
   },
   upperNebula: {
-    backgroundColor: cosmicTheme.colors.nebulaPurple,
-    height: 330,
-    right: -150,
-    top: 70,
-    width: 330,
+    height: 580,
+    right: -200,
+    top: -110,
+    width: 580,
   },
   lowerNebula: {
-    backgroundColor: cosmicTheme.colors.galaxyBlue,
-    bottom: 120,
-    height: 290,
-    left: -150,
-    width: 290,
+    bottom: -120,
+    height: 540,
+    left: -230,
+    width: 540,
   },
   galaxyBand: {
     height: '38%',

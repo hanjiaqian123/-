@@ -1,6 +1,7 @@
 import type { CitySearchResult } from '../types/models';
 
 const GEOCODING_URL = 'https://geocoding-api.open-meteo.com/v1/search';
+const CHANGSHA_ALIASES = new Set(['长沙', '长沙市']);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object';
@@ -41,12 +42,16 @@ function parseCity(value: unknown): CitySearchResult | null {
   };
 }
 
-export async function searchCities(query: string): Promise<CitySearchResult[]> {
-  const keyword = query.trim();
-  if (!keyword) {
-    return [];
-  }
+function isHunanChangsha(city: CitySearchResult): boolean {
+  const normalizedName = city.name.replace(/市$/, '');
+  const normalizedAdmin1 = city.admin1?.replace(/省$/, '');
 
+  return normalizedName === '长沙' &&
+    normalizedAdmin1 === '湖南' &&
+    city.country === '中国';
+}
+
+async function fetchCityResults(keyword: string): Promise<CitySearchResult[]> {
   const requestUrl = `${GEOCODING_URL}?name=${encodeURIComponent(
     keyword
   )}&count=10&language=zh&format=json`;
@@ -74,4 +79,33 @@ export async function searchCities(query: string): Promise<CitySearchResult[]> {
   return data.results
     .map(parseCity)
     .filter((city): city is CitySearchResult => city !== null);
+}
+
+export async function searchCities(query: string): Promise<CitySearchResult[]> {
+  const keyword = query.trim();
+  if (!keyword) {
+    return [];
+  }
+
+  const primaryResults = await fetchCityResults(keyword);
+  if (!CHANGSHA_ALIASES.has(keyword)) {
+    return primaryResults;
+  }
+
+  // Open-Meteo's Chinese query for “长沙” can return villages in other
+  // provinces without returning Hunan's prefecture-level Changsha. Use the
+  // canonical romanized query only for this ambiguous city, then verify the
+  // country and province instead of trusting the repeated place name alone.
+  const fallbackResults = primaryResults.some(isHunanChangsha)
+    ? []
+    : await fetchCityResults('Changsha');
+  const uniqueResults = new Map<number, CitySearchResult>();
+
+  for (const city of [...primaryResults, ...fallbackResults]) {
+    uniqueResults.set(city.id, city);
+  }
+
+  return [...uniqueResults.values()]
+    .sort((left, right) => Number(isHunanChangsha(right)) - Number(isHunanChangsha(left)))
+    .slice(0, 10);
 }
