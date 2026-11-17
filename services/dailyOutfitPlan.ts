@@ -1,5 +1,5 @@
 import type { ClothingCategory, HourlyWeather, OutfitRecommendation, WardrobeItem } from '../types/models';
-import { getOutfitRecommendations } from './outfitRecommendations';
+import { getOutfitRecommendations, type OutfitWeather } from './outfitRecommendations';
 
 export const DAY_PERIODS = [
   { id: 'morning', label: '早晨', startHour: 6, endHour: 11, timeLabel: '06:00–10:59', icon: '☀' },
@@ -37,6 +37,21 @@ export type PeriodPlan = {
   slots: PlanSlot[];
   reasons: string[];
 };
+
+export function getPeriodTrialWeather(plan: PeriodPlan): OutfitWeather | null {
+  const weather = plan.weather;
+  if (!plan.recommendation || !weather || weather.minApparent === null || weather.maxWind === null) return null;
+  return {
+    temperature_2m: weather.minTemperature,
+    apparent_temperature: weather.minApparent,
+    precipitation: weather.precipitation,
+    precipitation_probability: weather.maxRainProbability,
+    weather_code: weather.weather_code,
+    wind_speed_10m: weather.maxWind,
+    min_temperature: weather.minTemperature,
+    max_temperature: weather.maxTemperature,
+  };
+}
 
 export function getCityDate(now: Date, timezone?: string, utcOffsetSeconds?: number): string | null {
   if (!Number.isFinite(now.getTime())) return null;

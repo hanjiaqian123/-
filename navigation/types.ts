@@ -1,4 +1,5 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import type { OutfitWeather } from '../services/outfitRecommendations';
 
 import type {
   ClothingCategory,
@@ -26,6 +27,8 @@ export type RootStackParamList = {
   OutfitResult: {
     cityName: string;
     weather: CurrentWeather | null;
+    trialWeather?: OutfitWeather | null;
+    periodLabel?: string;
     recommendation: OutfitRecommendation | null;
   };
 };

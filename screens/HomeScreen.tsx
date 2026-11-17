@@ -17,6 +17,7 @@ import CitySearch from '../components/weather/CitySearch';
 import HourlyWeatherForecast from '../components/weather/HourlyWeather';
 import WeatherCard from '../components/weather/WeatherCard';
 import type { ScreenProps } from '../navigation/types';
+import { getPeriodTrialWeather, type PeriodPlan } from '../services/dailyOutfitPlan';
 import {
   fetchWeather,
   type WeatherSnapshotMetadata,
@@ -72,6 +73,7 @@ export default function HomeScreen({ navigation }: ScreenProps<'Home'>) {
   const [isWeatherStale, setIsWeatherStale] = useState(false);
   const [primaryRecommendationIndex, setPrimaryRecommendationIndex] =
     useState(0);
+  const [selectedPlan, setSelectedPlan] = useState<PeriodPlan | null>(null);
   const weatherRequestInFlight = useRef(false);
   const hasWeatherSnapshot = useRef(false);
 
@@ -263,6 +265,7 @@ export default function HomeScreen({ navigation }: ScreenProps<'Home'>) {
             lastUpdated={null}
             active={isFocused}
             onOpenWardrobe={() => navigation.navigate('Wardrobe')}
+            onSelectPlan={setSelectedPlan}
           />
           <Text style={styles.outfitEyebrow}>YOUR DAILY EDIT</Text>
           <Text style={styles.sectionTitle}>今日穿搭推荐</Text>
@@ -313,7 +316,9 @@ export default function HomeScreen({ navigation }: ScreenProps<'Home'>) {
               navigation.navigate('OutfitResult', {
                 cityName: selectedCity.name,
                 weather,
-                recommendation: primaryRecommendation,
+                trialWeather: selectedPlan ? getPeriodTrialWeather(selectedPlan) : weather,
+                periodLabel: selectedPlan ? `${selectedPlan.date ?? ''} ${selectedPlan.period.label} ${selectedPlan.period.timeLabel}（城市当地时间）` : '当前天气',
+                recommendation: selectedPlan ? selectedPlan.recommendation : primaryRecommendation,
               })
             }
             style={({ pressed }) => [

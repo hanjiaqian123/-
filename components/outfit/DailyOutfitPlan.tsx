@@ -3,7 +3,7 @@ import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
 import { useWardrobe } from '../../context/WardrobeContext';
-import { buildDailyOutfitPlan, type DayPeriodId } from '../../services/dailyOutfitPlan';
+import { buildDailyOutfitPlan, type DayPeriodId, type PeriodPlan } from '../../services/dailyOutfitPlan';
 import { cosmicTheme } from '../../theme/cosmicTheme';
 import type { HourlyWeather, WardrobeItem } from '../../types/models';
 import { getWeatherDisplay } from '../weather/WeatherCard';
@@ -20,6 +20,7 @@ type DailyOutfitPlanProps = {
   lastUpdated: Date | null;
   active: boolean;
   onOpenWardrobe: () => void;
+  onSelectPlan?: (plan: PeriodPlan) => void;
 };
 
 function WardrobeThumbnail({ item }: { item: WardrobeItem }) {
@@ -39,7 +40,7 @@ function WardrobeThumbnail({ item }: { item: WardrobeItem }) {
 
 export default function DailyOutfitPlan({
   hourly, cityName, timezone, utcOffsetSeconds, isLoading, weatherError,
-  lastUpdated, active, onOpenWardrobe,
+  lastUpdated, active, onOpenWardrobe, onSelectPlan,
 }: DailyOutfitPlanProps) {
   const wardrobe = useWardrobe();
   const [now, setNow] = useState(() => new Date());
@@ -63,6 +64,8 @@ export default function DailyOutfitPlan({
   const weather = plan.weather;
   const display = weather ? getWeatherDisplay(weather) : null;
   const matches = plan.slots.filter((slot) => slot.item).length;
+
+  useEffect(() => { onSelectPlan?.(plan); }, [onSelectPlan, plan]);
 
   return (
     <View style={styles.section} testID="daily-outfit-plan">
