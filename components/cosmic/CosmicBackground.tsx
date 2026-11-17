@@ -26,6 +26,8 @@ type CosmicBackgroundProps = {
   motionEnabled?: boolean;
   showPlanet?: boolean;
   galaxyBandOpacity?: number;
+  /** Optional sky beneath the existing nebula, stars and planet. */
+  sky?: ReactNode;
 };
 
 type StarConfig = {
@@ -120,6 +122,7 @@ export default function CosmicBackground({
   motionEnabled = true,
   showPlanet = true,
   galaxyBandOpacity = 1,
+  sky,
 }: CosmicBackgroundProps) {
   const reduceMotion = useReducedMotion();
   const [isAppActive, setIsAppActive] = useState(
@@ -189,13 +192,13 @@ export default function CosmicBackground({
         pointerEvents="none"
         style={styles.background}
       >
-        <LinearGradient
+        {sky ?? <LinearGradient
           colors={cosmicTheme.gradients.space}
           end={{ x: 0.82, y: 1 }}
           locations={[0, 0.35, 0.7, 1]}
           start={{ x: 0.12, y: 0 }}
           style={StyleSheet.absoluteFill}
-        />
+        />}
 
         <Animated.Image
           accessible={false}

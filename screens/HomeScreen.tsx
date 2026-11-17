@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import CosmicBackground from '../components/cosmic/CosmicBackground';
+import WeatherBackground from '../components/weather/WeatherBackground';
 import OutfitCard from '../components/outfit/OutfitCard';
 import DailyOutfitPlan from '../components/outfit/DailyOutfitPlan';
 import CitySearch from '../components/weather/CitySearch';
@@ -160,7 +160,7 @@ export default function HomeScreen({ navigation }: ScreenProps<'Home'>) {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <CosmicBackground motionEnabled={isFocused}>
+      <WeatherBackground weather={weather} motionEnabled={isFocused}>
       <ScrollView
         contentContainerStyle={styles.pageContent}
         showsVerticalScrollIndicator={false}
@@ -349,7 +349,7 @@ export default function HomeScreen({ navigation }: ScreenProps<'Home'>) {
         onSelectCity={selectCity}
         visible={isCitySearchVisible}
       />
-      </CosmicBackground>
+      </WeatherBackground>
     </SafeAreaView>
   );
 }
